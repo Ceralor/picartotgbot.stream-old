@@ -1,0 +1,3 @@
+[submodule "telescope"]
+	path = telescope
+	url = git@bitbucket.org:ceralor/telescope.git
