@@ -12,20 +12,18 @@ con.close()
 
 for user in unpaused_users:
     online_pull = get_online_channels_followed(user["picarto_access_token"])
-    print(online_pull)
-    if user["picarto_lastonline"] is None:
-        previous_online = {}
-    else:
-        previous_online = json.loads(user["picarto_lastonline"])
+    #print(online_pull)
+    prev_on_json = user["picarto_lastonline"] or "[]"
+    previous_online = json.loads(prev_on_json)
     message = "TEST, msg @Ceralor if OK! "
     if len(online_pull)>0:
-        new_streams = [ x for x in online_pull.values() if (x["user_id"] not in online_pull.keys()) \
-        and ( \
-            (user["show_nsfw"] == True and x["adult"] == False) or \
-            x["adult"] == False)\
-        and ( \
-            (user["show_games"] == True and x["gaming"] == True) or \
-            x["gaming"] == False)]
+        streams = online_pull.values()
+        new_streams = [x for x in streams if (x["user_id"] not in previous_online) and (not x["gaming"]) and (not x["adult"])]
+        new_streams_ids = [x["user_id"] for x in new_streams]
+        if user["show_nsfw"]:
+            new_streams.extend([x for x in streams if x["adult"]])
+        if user["show_games"]:
+            new_streams.extend([x for x in streams if x["gaming"]])
         if len(new_streams)>0:
             message += "The following users are now streaming:\n"
             message += "\n".join([x["name"] for x in new_streams])
@@ -37,23 +35,24 @@ for user in unpaused_users:
     else:
         message += "No one you follow is currently streaming."
     #bot.send_message(user["tguser_id"],message)
-    print(str(user["tguser_id"])+message)
+    #print(str(user["tguser_id"])+message)
     if len(online_pull.keys())>0:
         online_json = json.dumps([x for x in online_pull.keys()])
     else:
         online_json = "[]"
     con,cur = get_mysql_cursor(mysql)
-    cur.execute("UPDATE `users` SET `picarto_lastonline` = %s WHERE `tguser_id` = %s", \
-        [online_json, \
-        user["tguser_id"]])
-    con.commit()
+    #cur.execute("UPDATE `users` SET `picarto_lastonline` = %s WHERE `tguser_id` = %s", \
+    #    [online_json, \
+    #    user["tguser_id"]])
+    #con.commit()
     cur.close()
     con.close()
 
 con,cur = get_mysql_cursor(mysql)
 cur.execute("select tguser_id from users")
 users = cur.fetchall()
-for user in users:
+for user in [x[0] for x in users]:
+    #print(user)
     bot.send_message(user,"Thank you so much for helping me test this, I appreciate it greatly!")
 cur.close()
 con.close()
