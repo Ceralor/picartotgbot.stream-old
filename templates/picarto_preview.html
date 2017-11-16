@@ -1,0 +1,14 @@
+<html>
+	<head>
+		<title>{{ username }} is live!</title>
+		<meta name="description" content="{{ username }} is streaming on Picarto now!" />
+		<meta property="og:title" content="{{ username }} is live!" />
+		<meta property="og:description" content="{{ username }} is streaming on Picarto now!" />
+		<meta property="og:url" content="https://picarto.tv/{{ username }}" />
+		<meta property="og:image" content="https://picarto.tv/user_data/usrimg/{{ username.lower() }}/dsdefault.jpg?<?= time() ?>" />
+	</head>
+	<body>
+		<img src="https://picarto.tv/user_data/usrimg/{{ username.lower() }}/dsdefault.jpg?<?= time() ?>" id="og:image" />
+		<script type="text/javascript">window.location = "https://picarto.tv/{{ username }}"</script>
+	</body>
+</html>

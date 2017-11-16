@@ -1,0 +1,1 @@
+[{{ streamer_name }}]({{ preview_url }}) is now streaming{{ suffix }}! Check it out! https://picarto.tv/{{ streamer_name }}
