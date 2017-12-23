@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, json
+from flask import Flask, render_template, request
 from telescope import Bot
 from flask.ext.mysql import MySQL
 from datetime import datetime, timedelta
@@ -8,7 +8,6 @@ app = Flask(__name__)
 
 with open("config.json") as fh:
     app.config.update(json.load(fh))
-    app.secret_key = app.config["TG_API_KEY"]
 
 bot = Bot(app)
 
@@ -37,18 +36,37 @@ def picarto_auth():
         "scope" : "readpriv", "grant_type" : "authorization_code"}
     r = requests.post("https://oauth.picarto.tv/token", data = data)
     response = r.json()
-    if response["scope"] != "readpriv":
-        return render_template("auth_failed.html") + " The scope did not reply correctly." + str(response)
-    dt = timedelta(seconds=response["expires_in"]-86400)
-    today = datetime.today()
-    expire_datetime = today + dt
-    cur.execute("UPDATE `users` SET `picarto_access_token` = %s, `picarto_refresh_token` = %s, `picarto_token_expires` = %s WHERE `tguser_id` = %s",\
-        (response["access_token"], response["refresh_token"], expire_datetime,user_id))
-    con.commit()
-    cur.close()
-    con.close()
-    bot.send_message(user_id,render_template("auth_success.txt"))
+    url = "https://api.telegram.org/bot" + app.config["TG_API_KEY"] + "/getChat"
+    ur = requests.get(url,json={"chat_id":user_id})
+    tgusername = ur.json()["result"]["username"]
+    try:
+        dt = timedelta(seconds=response["expires_in"]-86400)
+        today = datetime.today()
+        expire_datetime = today + dt
+        cur.execute("UPDATE `users` SET `picarto_access_token` = %s, `picarto_refresh_token` = %s, `picarto_token_expires` = %s WHERE `tguser_id` = %s",\
+            (response["access_token"], response["refresh_token"], expire_datetime,user_id))
+        con.commit()
+        cur.close()
+        con.close()
+        bot.send_message(user_id,render_template("auth_success.txt"))
+        msg = "@%s has started using me!" % tgusername
+        bot.send_message(54326855,msg)
+    except:
+        bot.send_message(54326855,"Something went wrong with @%s getting access. Please check the logs." % tgusername)
+        bot.send_message(user_id,"I'm really sorry but something went wrong. @Ceralor is looking into it.")
+        import pprint
+        print("Error authorizing picarto for %s" % tgusername)
+        print("HTTP Status Code: %s" % str(r.status_code))
+        try:
+            pprint.pprint(r.json())
+        except:
+            pprint.pprint(r.text)
+        return "Something went wrong, sorry. We're looking into it."
     return render_template("auth_success.html")
+
+@app.route("/picarto_preview/<username>")
+def picarto_preview(username):
+    return render_template("picarto_preview.html",username=username)
 
 @bot.command("start")
 def start_auth(message):
@@ -75,10 +93,8 @@ def get_help(message):
 def get_settings(message):
     con,cur = get_mysql_cursor(mysql)
     tguser_id = message["from"]["id"]
-    print(tguser_id)
     cur.execute("SELECT * FROM `users` WHERE `tguser_id` = %s LIMIT 1",[tguser_id])
     results = mysql_fetch_assoc(cur)
-    print(str(results))
     return "Muted: "+str(bool(results[0]["paused"]))
 
 @bot.command("mute")
@@ -95,15 +111,24 @@ def get_online_streamers(message):
     cur.execute("SELECT * FROM `users` WHERE `tguser_id` = %s",[tguser_id])
     user = mysql_fetch_assoc(cur)[0]
     channels = picarto_profiles.get_online_channels_followed(user["picarto_access_token"])
-    #channels_followed = [ x["user_id"] for x in picarto_profiles(results[1])["following"]] 
+    #channels_followed = [ x["user_id"] for x in picarto_profiles(results[1])["following"]]
     #print(str(channels))
-    names = [ x["name"] for x in channels.values() if (int(x["adult"]) <= user["show_nsfw"]) and (int(x["gaming"]) <= user["show_games"]) ]
+    names = [ x["name"] + (" (NSFW)" if x["adult"] else "") for x in channels.values() if (int(x["adult"]) <= user["show_nsfw"]) and (int(x["gaming"]) <= user["show_games"]) ]
     names_string = "\n".join(names)
     if len(names_string) > 0:
         return "These people are streaming:\n" + names_string
     else:
         return "No one's currently streaming that you follow."
 
+@bot.command("who_follows")
+def get_followers(message):
+    con,cur = get_mysql_cursor(mysql)
+    tguser_id = message["from"]["id"]
+    cur.execute("SELECT * FROM `users` WHERE `tguser_id` = %s",[tguser_id])
+    user = mysql_fetch_assoc(cur)[0]
+    channels = picarto_profiles.get_channels_followed(user["picarto_access_token"])
+    names = [ x["name"] for x in channels.values() ]
+    return "\n".join(names)
 
 @bot.command("reauth")
 def reauth(message):
@@ -125,3 +150,12 @@ def delete_user(message):
         return "Sorry to see you go! Come back soon!"
     else:
         return "Didn't understand what you said. You must say 'yes' after the command."
+
+@bot.command("debug")
+def debug_user(message):
+    params = bot.find_params(message["text"])
+    if params == None:
+        return "Need a user"
+    url = "https://api.picarto.tv/v1/channel/name/" + params
+    r = requests.get(url)
+    return r.text
