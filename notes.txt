@@ -1,0 +1,27 @@
+****************************************************************************
+*                             New SQL Structure                            *
+****************************************************************************
+
+CREATE TABLE picarto_watching (
+    tguser_id  integer REFERENCES user_thingy (tguser_id),
+    picarto_id integer,
+    primary key (picarto_id, tguser_id)
+);
+
+CREATE TABLE picarto_lastonline (
+    tguser_id integer REFERENCES users (tguser_id)
+    picarto_id integer,
+    message_id integer,
+    primary key (picarto_id, message_id)
+);
+
+CREATE TABLE users (
+    tguser_id               integer PRIMARY KEY
+    picarto_access_token    varchar,
+    picarto_refresh_token   varchar,
+    picarto_token_expires   timestamp,
+
+    paused                  boolean DEFAULT(false),
+    show_games              boolean DEFAULT(false),
+    show_nsfw               boolean DEFAULT(false)
+);
